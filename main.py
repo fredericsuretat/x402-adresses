@@ -14,6 +14,8 @@ BAN_API = "https://api-adresse.data.gouv.fr/search/"
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
 wallet_address: str = ""
+payments_total: int = 0
+payments_log: list = []
 
 
 async def resolve_wallet() -> str:
@@ -136,7 +138,19 @@ async def x402_middleware(request: Request, call_next):
             content={"x402Version": 1, "error": "Paiement invalide ou expiré"},
         )
 
-    await call_facilitator("settle", payment_header, requirements)
+    settled = await call_facilitator("settle", payment_header, requirements)
+    if settled:
+        global payments_total, payments_log
+        payments_total += 1
+        from datetime import datetime, timezone
+        payments_log.append({
+            "n": payments_total,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "resource": str(request.url),
+        })
+        if len(payments_log) > 100:
+            payments_log = payments_log[-100:]
+        print(f"[x402] PAIEMENT #{payments_total} reçu — {request.url}")
     return await call_next(request)
 
 
@@ -186,6 +200,14 @@ async def validate_address(payload: AddressRequest):
         "lon": lon,
         "type": props.get("type"),
         "adresse_originale": adresse,
+    }
+
+
+@app.get("/stats")
+async def stats():
+    return {
+        "payments_total": payments_total,
+        "last_payments": payments_log[-5:] if payments_log else [],
     }
 
 
