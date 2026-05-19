@@ -17,24 +17,18 @@ wallet_address: str = ""
 
 
 async def resolve_wallet() -> str:
-    raw = os.getenv("WALLET_ADDRESS", "")
+    raw = os.getenv("WALLET_ADDRESS", "0x6458941857a70C6cA18c440a316035A21901A12b")
     if raw.startswith("0x"):
         return raw
-    # Résolution cb.id via l'API ENS de Coinbase (Base mainnet)
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            resp = await client.get(
-                f"https://api.coinbase.com/v2/resolve-identity",
-                params={"name": raw, "chain_id": "8453"},
-            )
-            data = resp.json()
-            resolved = data.get("data", {}).get("address")
+            resp = await client.get(f"https://api.ensdata.net/{raw}")
+            resolved = resp.json().get("address")
             if resolved:
                 print(f"[x402] {raw} → {resolved}")
                 return resolved
         except Exception:
             pass
-    # Fallback: résolution via RPC Base (eth_call sur ENS universel)
     print(f"[x402] Impossible de résoudre {raw}, utilisation brute")
     return raw
 
