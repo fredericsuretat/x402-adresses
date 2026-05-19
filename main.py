@@ -51,6 +51,33 @@ class AddressRequest(BaseModel):
     adresse: str
 
 
+BAZAAR_EXTENSION = {
+    "name": "USDC",
+    "version": "2",
+    "bazaar": {
+        "bodyType": "json",
+        "input": {"adresse": "15 rue de la paix paris"},
+        "inputSchema": {
+            "properties": {
+                "adresse": {"type": "string", "description": "Adresse française à valider"}
+            },
+            "required": ["adresse"],
+        },
+        "output": {
+            "example": {
+                "valide": True,
+                "adresse_normalisee": "15 Rue de la Paix, 75002 Paris",
+                "score": 0.97,
+                "lat": 48.8698,
+                "lon": 2.3311,
+                "ville": "Paris",
+                "code_postal": "75002",
+            }
+        },
+    },
+}
+
+
 def build_payment_requirements(resource_url: str) -> dict:
     return {
         "scheme": "exact",
@@ -62,7 +89,7 @@ def build_payment_requirements(resource_url: str) -> dict:
         "payTo": wallet_address,
         "maxTimeoutSeconds": 300,
         "asset": USDC_BASE,
-        "extra": {"name": "USDC", "version": "2"},
+        "extra": BAZAAR_EXTENSION,
     }
 
 
