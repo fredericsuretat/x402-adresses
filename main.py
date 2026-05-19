@@ -44,8 +44,9 @@ async def lifespan(app: FastAPI):
     global wallet_address
     wallet_address = await resolve_wallet()
     if not wallet_address:
-        raise RuntimeError("WALLET_ADDRESS manquant dans .env")
-    print(f"[x402] Wallet actif : {wallet_address}")
+        print("[x402] AVERTISSEMENT : WALLET_ADDRESS non défini, les paiements ne seront pas encaissés")
+    else:
+        print(f"[x402] Wallet actif : {wallet_address}")
     yield
 
 
