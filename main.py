@@ -81,6 +81,8 @@ BAZAAR_EXTENSION = {
 
 
 def build_payment_requirements(resource_url: str) -> dict:
+    if resource_url.startswith("http://"):
+        resource_url = "https://" + resource_url[7:]
     return {
         "scheme": "exact",
         "network": "base",
