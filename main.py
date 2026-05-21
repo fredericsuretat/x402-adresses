@@ -209,6 +209,8 @@ async def validate_address(payload: AddressRequest):
 async def stats():
     return {
         "payments_total": payments_total,
+        "revenue_usdc": round(payments_total * float(PRICE_USDC), 8),
+        "price_usdc": PRICE_USDC,
         "last_payments": payments_log[-5:] if payments_log else [],
     }
 
