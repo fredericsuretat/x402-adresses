@@ -57,24 +57,29 @@ BAZAAR_EXTENSION = {
     "name": "USDC",
     "version": "2",
     "bazaar": {
+        "discoverable": True,
+        "category": "data",
+        "tags": ["adresse", "france", "geocoding", "validation", "ban", "postal"],
         "bodyType": "json",
         "input": {"adresse": "15 rue de la paix paris"},
         "inputSchema": {
+            "type": "object",
             "properties": {
-                "adresse": {"type": "string", "description": "Adresse française à valider"}
+                "adresse": {"type": "string", "description": "Adresse française à valider et normaliser"}
             },
             "required": ["adresse"],
         },
-        "output": {
-            "example": {
-                "valide": True,
-                "adresse_normalisee": "15 Rue de la Paix, 75002 Paris",
-                "score": 0.97,
-                "lat": 48.8698,
-                "lon": 2.3311,
-                "ville": "Paris",
-                "code_postal": "75002",
-            }
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "valide": {"type": "boolean"},
+                "adresse_normalisee": {"type": "string"},
+                "score": {"type": "number"},
+                "lat": {"type": "number"},
+                "lon": {"type": "number"},
+                "ville": {"type": "string"},
+                "code_postal": {"type": "string"},
+            },
         },
     },
 }
