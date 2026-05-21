@@ -153,6 +153,15 @@ async def call_facilitator(endpoint: str, payment_header: str, requirements: dic
             return False
 
 
+_CORS_HEADERS = {
+    "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, X-PAYMENT, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Expose-Headers": "X-PAYMENT-RESPONSE",
+}
+
+
 @app.middleware("http")
 async def x402_middleware(request: Request, call_next):
     if not request.url.path.startswith("/validate"):
@@ -168,7 +177,7 @@ async def x402_middleware(request: Request, call_next):
     if not payment_header:
         return JSONResponse(
             status_code=402,
-            headers={"Cache-Control": "no-store"},
+            headers=_CORS_HEADERS,
             content={
                 "x402Version": 1,
                 "accepts": [requirements],
@@ -180,7 +189,7 @@ async def x402_middleware(request: Request, call_next):
     if not is_valid:
         return JSONResponse(
             status_code=402,
-            headers={"Cache-Control": "no-store"},
+            headers=_CORS_HEADERS,
             content={"x402Version": 1, "error": "Paiement invalide ou expiré"},
         )
 
