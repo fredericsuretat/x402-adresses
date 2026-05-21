@@ -6,5 +6,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 
-EXPOSE 7860
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips=*"]
+EXPOSE 3033
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3033", "--proxy-headers", "--forwarded-allow-ips=*"]

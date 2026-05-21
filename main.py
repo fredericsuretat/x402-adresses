@@ -1,15 +1,35 @@
 import os
+import base64
+import json
+import time
+import secrets
 import httpx
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 load_dotenv()
 
 PRICE_USDC = os.getenv("PRICE_USDC", "0.001")
-FACILITATOR_URL = "https://x402.org/facilitator"
+FACILITATOR_URL = os.getenv("FACILITATOR_URL", "https://x402.org/facilitator")
+CDP_API_KEY_ID     = os.getenv("CDP_API_KEY_ID")
+CDP_API_KEY_SECRET = os.getenv("CDP_API_KEY_SECRET")
+
+def _cdp_jwt(method: str, path: str) -> str:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    raw = base64.b64decode(CDP_API_KEY_SECRET)
+    private_key = Ed25519PrivateKey.from_private_bytes(raw[:32])
+    now = int(time.time())
+    nonce = secrets.token_hex(16)
+    def b64url(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+    header = b64url(json.dumps({"alg": "EdDSA", "typ": "JWT", "kid": CDP_API_KEY_ID, "nonce": nonce}).encode())
+    payload = b64url(json.dumps({"sub": CDP_API_KEY_ID, "iss": "cdp", "nbf": now, "exp": now + 120, "uri": f"{method} api.cdp.coinbase.com{path}"}).encode())
+    sig = b64url(private_key.sign(f"{header}.{payload}".encode()))
+    return f"{header}.{payload}.{sig}"
 BAN_API = "https://api-adresse.data.gouv.fr/search/"
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
@@ -47,6 +67,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Validateur Adresses FR", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-PAYMENT", "Authorization"],
+    expose_headers=["X-PAYMENT-RESPONSE"],
+)
 
 
 class AddressRequest(BaseModel):
@@ -103,15 +131,20 @@ def build_payment_requirements(resource_url: str) -> dict:
 
 
 async def call_facilitator(endpoint: str, payment_header: str, requirements: dict) -> bool:
+    use_cdp = bool(CDP_API_KEY_ID and CDP_API_KEY_SECRET)
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
+            headers = {"Content-Type": "application/json"}
+            if use_cdp:
+                payment = json.loads(base64.b64decode(payment_header).decode())
+                body = {"x402Version": 1, "paymentPayload": payment, "paymentRequirements": [requirements]}
+                headers["Authorization"] = f"Bearer {_cdp_jwt('POST', f'/platform/v2/x402/{endpoint}')}"
+            else:
+                body = {"x402Version": 1, "paymentHeader": payment_header, "paymentRequirements": [requirements]}
             resp = await client.post(
                 f"{FACILITATOR_URL}/{endpoint}",
-                json={
-                    "x402Version": 1,
-                    "paymentHeader": payment_header,
-                    "paymentRequirements": [requirements],
-                },
+                json=body,
+                headers=headers,
             )
             if endpoint == "verify":
                 return resp.json().get("isValid", False)
@@ -125,12 +158,17 @@ async def x402_middleware(request: Request, call_next):
     if not request.url.path.startswith("/validate"):
         return await call_next(request)
 
+    # Let OPTIONS (CORS preflight) pass through
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     requirements = build_payment_requirements(str(request.url))
     payment_header = request.headers.get("X-PAYMENT")
 
     if not payment_header:
         return JSONResponse(
             status_code=402,
+            headers={"Cache-Control": "no-store"},
             content={
                 "x402Version": 1,
                 "accepts": [requirements],
@@ -142,6 +180,7 @@ async def x402_middleware(request: Request, call_next):
     if not is_valid:
         return JSONResponse(
             status_code=402,
+            headers={"Cache-Control": "no-store"},
             content={"x402Version": 1, "error": "Paiement invalide ou expiré"},
         )
 
@@ -159,6 +198,22 @@ async def x402_middleware(request: Request, call_next):
             payments_log = payments_log[-100:]
         print(f"[x402] PAIEMENT #{payments_total} reçu — {request.url}")
     return await call_next(request)
+
+
+@app.get("/.well-known/x402.json")
+async def x402_discovery(request: Request):
+    base = str(request.base_url).rstrip("/")
+    return {
+        "x402Version": 1,
+        "endpoints": [
+            {"path": "/validate", "method": "POST", "price": PRICE_USDC, "network": "base",
+             "asset": USDC_BASE, "payTo": wallet_address,
+             "description": "Validation d'adresse française — Base Adresse Nationale"},
+        ],
+        "docs": f"{base}/docs",
+        "health": f"{base}/health",
+        "stats": f"{base}/stats",
+    }
 
 
 @app.get("/")
