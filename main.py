@@ -72,7 +72,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "X-PAYMENT", "Authorization"],
+    allow_headers=["Content-Type", "X-PAYMENT", "Payment-Signature", "Authorization"],
     expose_headers=["X-PAYMENT-RESPONSE"],
 )
 
@@ -156,7 +156,7 @@ async def call_facilitator(endpoint: str, payment_header: str, requirements: dic
 _CORS_HEADERS = {
     "Cache-Control": "no-store",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, X-PAYMENT, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, X-PAYMENT, Payment-Signature, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Expose-Headers": "X-PAYMENT-RESPONSE",
 }
